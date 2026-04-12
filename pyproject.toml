@@ -1,0 +1,14 @@
+[project]
+name = "jupyter-dashboard"
+version = "0.1.0"
+description = "SSH Jupyter Console - browser-based remote Jupyter Lab manager"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "paramiko",
+    "websockets",
+    "pydantic",
+    "python-multipart",
+]
+
