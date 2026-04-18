@@ -293,7 +293,8 @@ async def sftp_file_info(req: SFTPPathRequest):
         )
 
         file_info['viewer_config'] = {
-            'max_file_size': viewer_config.get('max_file_size', 2097152)
+            'max_file_size': viewer_config.get('max_file_size', 2097152),
+            'table_extensions': viewer_config.get('table_extensions', ['csv', 'tsv', 'psv', 'ssv'])
         }
 
         elapsed = time.time() - start_time

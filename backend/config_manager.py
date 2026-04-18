@@ -57,7 +57,8 @@ DEFAULT_APP_CONFIG = {
     },
     "viewer": {
         "max_file_size": 2097152,  # 2 MB
-        "text_extensions": _DEFAULT_TEXT_EXTENSIONS
+        "text_extensions": _DEFAULT_TEXT_EXTENSIONS,
+        "table_extensions": ["csv", "tsv", "psv", "ssv"]
     },
     "editor": {
         "theme": "vs",

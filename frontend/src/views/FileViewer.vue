@@ -50,7 +50,7 @@
       <!-- Sidebar -->
       <div v-show="showSidebar" class="editor-sidebar">
         <div class="sidebar-header">
-          <span>Editor Settings</span>
+          <span>{{ isTableFile && showTablePreview ? 'Table Settings' : 'Editor Settings' }}</span>
           <n-button text size="small" @click="showSidebar = false">
             <template #icon>
               <n-icon :component="ChevronBackOutline" />
@@ -58,51 +58,90 @@
           </n-button>
         </div>
         <div class="sidebar-content">
-          <!-- Theme -->
-          <div class="setting-item">
-            <label>Theme</label>
-            <n-select
-              v-model:value="editorTheme"
-              :options="themeOptions"
-              size="small"
-              @update:value="onThemeChange"
-            />
-          </div>
+          <!-- Table Settings -->
+          <template v-if="isTableFile && showTablePreview">
+            <!-- Delimiter -->
+            <div class="setting-item">
+              <label>Delimiter</label>
+              <n-select
+                v-model:value="tableDelimiterOption"
+                :options="delimiterOptions"
+                size="small"
+                @update:value="onDelimiterOptionChange"
+              />
+            </div>
+            <div v-if="tableDelimiterOption === 'custom'" class="setting-item">
+              <label>Custom Delimiter</label>
+              <n-input
+                v-model:value="tableDelimiter"
+                size="small"
+                placeholder="Enter delimiter"
+                maxlength="4"
+              />
+            </div>
 
-          <!-- Font Size -->
-          <div class="setting-item">
-            <label>Font Size</label>
-            <n-select
-              v-model:value="fontSize"
-              :options="fontSizeOptions"
-              size="small"
-              @update:value="onFontSizeChange"
-            />
-          </div>
+            <!-- First Row as Header -->
+            <div class="setting-item setting-item--row">
+              <label>First Row as Header</label>
+              <n-switch v-model:value="useFirstRowAsHeader" size="small" />
+            </div>
 
-          <!-- Font Family -->
-          <div class="setting-item">
-            <label>Font Family</label>
-            <n-select
-              v-model:value="fontFamily"
-              :options="fontFamilyOptions"
-              size="small"
-              @update:value="onFontFamilyChange"
-            />
-          </div>
+            <!-- Reset Sort -->
+            <div v-if="svTableRef?.hasSorting" class="setting-item">
+              <n-button size="small" block @click="svTableRef.resetSort()">
+                Reset Sort
+              </n-button>
+            </div>
+          </template>
 
-          <!-- Language -->
-          <div class="setting-item">
-            <label>Language</label>
-            <n-select
-              v-model:value="selectedLanguage"
-              :options="languageOptions"
-              size="small"
-              filterable
-              :consistent-menu-width="false"
-              @update:value="onLanguageChange"
-            />
-          </div>
+          <!-- Editor Settings -->
+          <template v-else>
+            <!-- Theme -->
+            <div class="setting-item">
+              <label>Theme</label>
+              <n-select
+                v-model:value="editorTheme"
+                :options="themeOptions"
+                size="small"
+                @update:value="onThemeChange"
+              />
+            </div>
+
+            <!-- Font Size -->
+            <div class="setting-item">
+              <label>Font Size</label>
+              <n-select
+                v-model:value="fontSize"
+                :options="fontSizeOptions"
+                size="small"
+                @update:value="onFontSizeChange"
+              />
+            </div>
+
+            <!-- Font Family -->
+            <div class="setting-item">
+              <label>Font Family</label>
+              <n-select
+                v-model:value="fontFamily"
+                :options="fontFamilyOptions"
+                size="small"
+                @update:value="onFontFamilyChange"
+              />
+            </div>
+
+            <!-- Language -->
+            <div class="setting-item">
+              <label>Language</label>
+              <n-select
+                v-model:value="selectedLanguage"
+                :options="languageOptions"
+                size="small"
+                filterable
+                :consistent-menu-width="false"
+                @update:value="onLanguageChange"
+              />
+            </div>
+          </template>
         </div>
       </div>
 
@@ -135,6 +174,17 @@
               </template>
               {{ showPreview ? 'Edit' : 'Preview' }}
             </n-button>
+            <n-button
+              v-if="isTableFile"
+              size="small"
+              :type="showTablePreview ? 'primary' : 'default'"
+              @click="showTablePreview = !showTablePreview"
+            >
+              <template #icon>
+                <n-icon :component="showTablePreview ? CreateOutline : EyeOutline" />
+              </template>
+              {{ showTablePreview ? 'Edit' : 'Preview' }}
+            </n-button>
             <n-button size="small" @click="downloadFile">
               <template #icon>
                 <n-icon :component="DownloadOutline" />
@@ -164,6 +214,13 @@
             :class="editorTheme === 'vs-dark' || editorTheme === 'hc-black' ? 'markdown-preview--dark' : ''"
             v-html="renderedMarkdown"
           />
+          <SvTablePreview
+            v-else-if="isTableFile && showTablePreview"
+            ref="svTableRef"
+            :content="fileContent"
+            :delimiter="tableDelimiter"
+            :use-first-row-as-header="useFirstRowAsHeader"
+          />
           <MonacoEditor
             v-else
             ref="monacoEditorRef"
@@ -192,7 +249,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  NSpin, NResult, NButton, NSpace, NIcon, NTag, NSelect,
+  NSpin, NResult, NButton, NSpace, NIcon, NTag, NSelect, NSwitch, NInput,
   createDiscreteApi
 } from 'naive-ui'
 import {
@@ -204,6 +261,7 @@ import axios from 'axios'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import MonacoEditor from '../components/MonacoEditor.vue'
+import SvTablePreview from '../components/SvTablePreview.vue'
 import configStore from '../stores/config.js'
 
 const { message } = createDiscreteApi(['message'])
@@ -308,6 +366,36 @@ const monacoEditorRef = ref(null)
 // Markdown preview state
 const showPreview = ref(false)
 
+// Table preview state
+const showTablePreview = ref(true)
+const tableDelimiter = ref(',')
+const tableDelimiterOption = ref('comma')
+const useFirstRowAsHeader = ref(true)
+const svTableRef = ref(null)
+
+const delimiterOptions = [
+  { label: 'Comma (,)', value: 'comma' },
+  { label: 'Tab (\\t)', value: 'tab' },
+  { label: 'Pipe (|)', value: 'pipe' },
+  { label: 'Semicolon (;)', value: 'semicolon' },
+  { label: 'Space', value: 'space' },
+  { label: 'Custom', value: 'custom' },
+]
+
+const delimiterMap = {
+  comma: ',',
+  tab: '\t',
+  pipe: '|',
+  semicolon: ';',
+  space: ' ',
+}
+
+const onDelimiterOptionChange = (val) => {
+  if (val !== 'custom') {
+    tableDelimiter.value = delimiterMap[val]
+  }
+}
+
 // Sidebar and settings state
 const showSidebar = ref(true)
 const editorTheme = ref('vs')
@@ -399,6 +487,13 @@ const isMarkdown = computed(() => {
   return selectedLanguage.value === 'markdown'
 })
 
+// Check if current file is a table file
+const isTableFile = computed(() => {
+  const ext = fileInfo.value?.extension
+  const tableExts = fileInfo.value?.viewer_config?.table_extensions || []
+  return tableExts.includes(ext)
+})
+
 // Rendered markdown HTML
 const renderedMarkdown = computed(() => {
   if (!isMarkdown.value) return ''
@@ -449,6 +544,16 @@ const loadFileInfo = async () => {
       fileInfo.value = res.data
       document.title = res.data.name
       selectedLanguage.value = fileLanguage.value
+
+      // Auto-infer table delimiter from extension
+      const extDelimMap = { csv: ',', tsv: '\t', psv: '|', ssv: ';' }
+      const extOptMap = { csv: 'comma', tsv: 'tab', psv: 'pipe', ssv: 'semicolon' }
+      const ext = res.data.extension
+      if (ext in extDelimMap) {
+        tableDelimiter.value = extDelimMap[ext]
+        tableDelimiterOption.value = extOptMap[ext]
+        showTablePreview.value = true
+      }
 
       // Handle based on file type and size
       if (isLargeFile.value) {
@@ -739,6 +844,16 @@ watch(fileLanguage, (newLang) => {
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.setting-item--row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-item--row label {
+  margin-bottom: 0;
 }
 
 .editor-main {
