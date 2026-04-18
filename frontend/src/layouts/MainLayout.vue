@@ -28,87 +28,96 @@
 
       <div style="display: flex; flex: 1; overflow: hidden; width: 100%;">
         <!-- Left Sidebar - Connection Config -->
-        <div style="width: 380px; flex-shrink: 0; background: #f9f9f9; border-right: 1px solid #eee; padding: 20px; overflow-y: auto;">
-          <n-card hoverable>
-            <template #header>
-              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span>Session Configuration</span>
-                <!-- Navigation Buttons -->
-                <n-button-group size="small">
-                  <n-button
-                    :type="activePanel === 'jupyter' ? 'primary' : 'default'"
-                    @click="switchPanel('jupyter')"
-                    title="Jupyter Lab"
-                  >
-                    <template #icon>
-                      <LogoPythonIcon />
-                    </template>
-                  </n-button>
-                  <n-button
-                    :type="activePanel === 'files' ? 'primary' : 'default'"
-                    @click="switchPanel('files')"
-                    :disabled="!connected"
-                    title="File Browser"
-                  >
-                    <template #icon>
-                      <FolderOpenOutlineIcon />
-                    </template>
-                  </n-button>
-                </n-button-group>
-              </div>
-            </template>
-            <n-form label-placement="top" label-align="left" show-require-mark>
-              <n-grid :cols="2" :x-gap="12">
-                <n-grid-item span="2">
-                   <n-form-item label="Host Server">
-                    <n-input v-model:value="config.host" placeholder="grace.hprc.tamu.edu" :disabled="connected" />
-                  </n-form-item>
-                </n-grid-item>
-                <n-grid-item>
-                  <n-form-item label="NetID / User">
-                    <n-input v-model:value="config.user" placeholder="User" :disabled="connected" />
-                  </n-form-item>
-                </n-grid-item>
-                <n-grid-item>
-                  <n-form-item label="2FA Code / Option">
-                    <n-input
-                        v-model:value="config.auth_code"
-                        placeholder="1 for Push, or Code"
-                        :disabled="connected"
-                        title="Enter '1' for Duo Push, or your 6-digit code"
-                    />
-                  </n-form-item>
-                </n-grid-item>
-                <n-grid-item span="2">
-                  <n-form-item label="Password">
-                    <n-input type="password" show-password-on="click" v-model:value="config.password" placeholder="******" :disabled="connected" />
-                  </n-form-item>
-                </n-grid-item>
-              </n-grid>
+        <div class="sidebar-panel" :style="{ width: sidebarWidth + 'px' }">
+          <!-- 折叠状态：窄条 + 展开图标 -->
+          <div v-if="sidebarCollapsed" class="sidebar-collapsed-strip" @click="onSidebarExpandClick" title="Click to expand">
+            <span class="sidebar-expand-icon">›</span>
+          </div>
+          <!-- 正常内容 -->
+          <div v-else class="sidebar-content">
+            <n-card hoverable>
+              <template #header>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <span>Session Configuration</span>
+                  <!-- Navigation Buttons -->
+                  <n-button-group size="small">
+                    <n-button
+                      :type="activePanel === 'jupyter' ? 'primary' : 'default'"
+                      @click="switchPanel('jupyter')"
+                      title="Jupyter Lab"
+                    >
+                      <template #icon>
+                        <LogoPythonIcon />
+                      </template>
+                    </n-button>
+                    <n-button
+                      :type="activePanel === 'files' ? 'primary' : 'default'"
+                      @click="switchPanel('files')"
+                      :disabled="!connected"
+                      title="File Browser"
+                    >
+                      <template #icon>
+                        <FolderOpenOutlineIcon />
+                      </template>
+                    </n-button>
+                  </n-button-group>
+                </div>
+              </template>
+              <n-form label-placement="top" label-align="left" show-require-mark>
+                <n-grid :cols="2" :x-gap="12">
+                  <n-grid-item span="2">
+                    <n-form-item label="Host Server">
+                      <n-input v-model:value="config.host" placeholder="grace.hprc.tamu.edu" :disabled="connected" />
+                    </n-form-item>
+                  </n-grid-item>
+                  <n-grid-item>
+                    <n-form-item label="NetID / User">
+                      <n-input v-model:value="config.user" placeholder="User" :disabled="connected" />
+                    </n-form-item>
+                  </n-grid-item>
+                  <n-grid-item>
+                    <n-form-item label="2FA Code / Option">
+                      <n-input
+                          v-model:value="config.auth_code"
+                          placeholder="1 for Push, or Code"
+                          :disabled="connected"
+                          title="Enter '1' for Duo Push, or your 6-digit code"
+                      />
+                    </n-form-item>
+                  </n-grid-item>
+                  <n-grid-item span="2">
+                    <n-form-item label="Password">
+                      <n-input type="password" show-password-on="click" v-model:value="config.password" placeholder="******" :disabled="connected" />
+                    </n-form-item>
+                  </n-grid-item>
+                </n-grid>
 
-              <n-form-item label="Initialization Script">
-                <n-input
-                  class="code-editor"
-                  v-model:value="globalInitScript"
-                  type="textarea"
-                  :autosize="{ minRows: 4, maxRows: 10 }"
-                  placeholder="module load Anaconda3..."
-                  :disabled="connected"
-                />
-              </n-form-item>
+                <n-form-item label="Initialization Script">
+                  <n-input
+                    class="code-editor"
+                    v-model:value="globalInitScript"
+                    type="textarea"
+                    :autosize="{ minRows: 4, maxRows: 10 }"
+                    placeholder="module load Anaconda3..."
+                    :disabled="connected"
+                  />
+                </n-form-item>
 
-              <n-button
-                block
-                size="large"
-                @click="handleConnectionAction"
-                :loading="loading"
-                :type="connected ? 'error' : 'primary'"
-                :color="connected ? undefined : '#2080f0'"
-              >
-                {{ connected ? 'Disconnect & Clear' : 'Connect & Initialize' }}
-              </n-button>
-            </n-form>
-          </n-card>
+                <n-button
+                  block
+                  size="large"
+                  @click="handleConnectionAction"
+                  :loading="loading"
+                  :type="connected ? 'error' : 'primary'"
+                  :color="connected ? undefined : '#2080f0'"
+                >
+                  {{ connected ? 'Disconnect & Clear' : 'Connect & Initialize' }}
+                </n-button>
+              </n-form>
+            </n-card>
+          </div>
+          <!-- 拖拽手柄：始终渲染 -->
+          <div class="sidebar-drag-handle" @mousedown="onSidebarHandleMousedown"></div>
         </div>
 
         <!-- Main Content Area -->
@@ -125,12 +134,21 @@
       </div>
 
       <!-- Terminal Section - Full Width -->
-      <div style="height: 220px; background: #1e1e1e; flex-shrink: 0; border-top: 1px solid #333; display: flex; flex-direction: column; width: 100%;">
-        <div style="padding: 5px 15px; background: #2d2d2d; color: #aaa; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between;">
+      <div class="terminal-section" :style="{ height: terminalHeight + 'px' }">
+        <!-- 拖拽手柄：顶部横条 -->
+        <div class="terminal-drag-handle" @mousedown="onTermHandleMousedown"></div>
+        <!-- 标题栏：折叠时可点击展开 -->
+        <div
+          class="terminal-titlebar"
+          :class="{ 'terminal-titlebar--collapsed': terminalCollapsed }"
+          @click="onTermTitleClick"
+          :style="{ cursor: terminalCollapsed ? 'pointer' : 'default' }"
+        >
           <span>TERMINAL / LOGS (Interactive for 2FA)</span>
-          <span :style="{color: connected ? '#18a058' : '#666'}">{{ connected ? '● Live' : '○ Offline' }}</span>
+          <span :style="{ color: connected ? '#18a058' : '#666' }">{{ connected ? '● Live' : '○ Offline' }}</span>
         </div>
-        <div ref="terminalContainer" style="flex: 1; overflow: hidden; padding: 5px;"></div>
+        <!-- 终端容器：折叠时隐藏 -->
+        <div v-show="!terminalCollapsed" ref="terminalContainer" class="terminal-body"></div>
       </div>
 
       <!-- Server Config Modal -->
@@ -169,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, provide, watch } from 'vue'
+import { ref, onMounted, computed, provide, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import JupyterPanel from '../views/JupyterPanel.vue'
 import FileBrowser from '../views/FileBrowser.vue'
@@ -199,6 +217,22 @@ const connected = ref(false)
 const loading = ref(false)
 const config = ref({ host: '', user: '', password: '', auth_code: '1' })
 const globalInitScript = ref('')
+
+// Terminal 面板拖拽状态
+const terminalHeight = ref(220)
+const terminalCollapsed = ref(false)
+const previousTerminalHeight = ref(220)
+const TERMINAL_MIN_HEIGHT = 60
+const TERMINAL_COLLAPSED_HEIGHT = 32
+const TERMINAL_DEFAULT_HEIGHT = 220
+
+// Sidebar 面板拖拽状态
+const sidebarWidth = ref(380)
+const sidebarCollapsed = ref(false)
+const previousSidebarWidth = ref(380)
+const SIDEBAR_MIN_WIDTH = 60
+const SIDEBAR_COLLAPSED_WIDTH = 16
+const SIDEBAR_DEFAULT_WIDTH = 380
 
 // Panel switching state
 const activePanel = ref('jupyter')
@@ -437,6 +471,89 @@ const handleOpenFileBrowser = (dir) => {
   // 切换到文件浏览器面板
   switchPanel('files')
 }
+
+// ── Terminal 面板：上下拖拽 ────────────────────────────────
+let termDragState = null
+
+const onTermHandleMousedown = (e) => {
+  e.preventDefault()
+  termDragState = { startY: e.clientY, startHeight: terminalHeight.value }
+  document.addEventListener('mousemove', onTermDragMove)
+  document.addEventListener('mouseup', onTermDragEnd)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+}
+
+const onTermDragMove = (e) => {
+  if (!termDragState) return
+  const delta = termDragState.startY - e.clientY
+  const newHeight = termDragState.startHeight + delta
+  terminalHeight.value = Math.min(Math.max(newHeight, 0), window.innerHeight * 0.6)
+}
+
+const onTermDragEnd = () => {
+  document.removeEventListener('mousemove', onTermDragMove)
+  document.removeEventListener('mouseup', onTermDragEnd)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+  if (terminalHeight.value < TERMINAL_MIN_HEIGHT) {
+    previousTerminalHeight.value = termDragState.startHeight > TERMINAL_MIN_HEIGHT
+      ? termDragState.startHeight : TERMINAL_DEFAULT_HEIGHT
+    terminalHeight.value = TERMINAL_COLLAPSED_HEIGHT
+    terminalCollapsed.value = true
+  } else {
+    terminalCollapsed.value = false
+    nextTick(() => setTimeout(() => fitAddon && fitAddon.fit(), 50))
+  }
+  termDragState = null
+}
+
+const onTermTitleClick = () => {
+  if (!terminalCollapsed.value) return
+  terminalHeight.value = previousTerminalHeight.value || TERMINAL_DEFAULT_HEIGHT
+  terminalCollapsed.value = false
+  nextTick(() => setTimeout(() => fitAddon && fitAddon.fit(), 50))
+}
+
+// ── Sidebar 面板：左右拖拽 ────────────────────────────────
+let sidebarDragState = null
+
+const onSidebarHandleMousedown = (e) => {
+  e.preventDefault()
+  sidebarDragState = { startX: e.clientX, startWidth: sidebarWidth.value }
+  document.addEventListener('mousemove', onSidebarDragMove)
+  document.addEventListener('mouseup', onSidebarDragEnd)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ew-resize'
+}
+
+const onSidebarDragMove = (e) => {
+  if (!sidebarDragState) return
+  const delta = e.clientX - sidebarDragState.startX
+  const newWidth = sidebarDragState.startWidth + delta
+  sidebarWidth.value = Math.min(Math.max(newWidth, 0), window.innerWidth * 0.6)
+}
+
+const onSidebarDragEnd = () => {
+  document.removeEventListener('mousemove', onSidebarDragMove)
+  document.removeEventListener('mouseup', onSidebarDragEnd)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+  if (sidebarWidth.value < SIDEBAR_MIN_WIDTH) {
+    previousSidebarWidth.value = sidebarDragState.startWidth > SIDEBAR_MIN_WIDTH
+      ? sidebarDragState.startWidth : SIDEBAR_DEFAULT_WIDTH
+    sidebarWidth.value = SIDEBAR_COLLAPSED_WIDTH
+    sidebarCollapsed.value = true
+  } else {
+    sidebarCollapsed.value = false
+  }
+  sidebarDragState = null
+}
+
+const onSidebarExpandClick = () => {
+  sidebarWidth.value = previousSidebarWidth.value || SIDEBAR_DEFAULT_WIDTH
+  sidebarCollapsed.value = false
+}
 </script>
 
 <style scoped>
@@ -461,5 +578,115 @@ const handleOpenFileBrowser = (dir) => {
 
 :deep(.xterm-screen) {
   text-align: left !important;
+}
+
+/* ── Sidebar 面板 ─────────────────────────── */
+.sidebar-panel {
+  position: relative;
+  flex-shrink: 0;
+  background: #f9f9f9;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.sidebar-collapsed-strip {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #f0f0f0;
+  transition: background 0.2s;
+}
+
+.sidebar-collapsed-strip:hover {
+  background: rgba(24, 160, 88, 0.12);
+}
+
+.sidebar-expand-icon {
+  font-size: 18px;
+  color: #666;
+  user-select: none;
+}
+
+.sidebar-drag-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 20;
+  transition: background 0.15s;
+}
+
+.sidebar-drag-handle:hover {
+  background: rgba(24, 160, 88, 0.35);
+}
+
+/* ── Terminal 面板 ─────────────────────────── */
+.terminal-section {
+  background: #1e1e1e;
+  flex-shrink: 0;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: relative;
+  min-height: 32px;
+}
+
+.terminal-drag-handle {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  z-index: 20;
+  transition: background 0.15s;
+}
+
+.terminal-drag-handle:hover {
+  background: rgba(24, 160, 88, 0.35);
+}
+
+.terminal-titlebar {
+  padding: 5px 15px;
+  background: #2d2d2d;
+  color: #aaa;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.terminal-titlebar--collapsed {
+  background: #383838;
+}
+
+.terminal-titlebar--collapsed:hover {
+  background: #404040;
+}
+
+.terminal-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 5px;
 }
 </style>
