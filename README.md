@@ -72,10 +72,10 @@ The launch script automatically synchronizes the port configuration and starts t
 **Manual start (alternative):**
 ```bash
 # Using uv
-uv run uvicorn main:app --host 127.0.0.1 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
 # Using pip
-uvicorn main:app --host 127.0.0.1 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Configuration Files

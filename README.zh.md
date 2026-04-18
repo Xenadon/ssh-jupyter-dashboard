@@ -72,10 +72,10 @@ uv run launch.py 8001
 **手动启动（替代方式）：**
 ```bash
 # 使用 uv
-uv run uvicorn main:app --host 127.0.0.1 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
 # 使用 pip
-uvicorn main:app --host 127.0.0.1 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ## 配置文件说明
