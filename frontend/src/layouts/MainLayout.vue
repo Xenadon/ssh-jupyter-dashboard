@@ -67,7 +67,15 @@
                 <n-grid :cols="2" :x-gap="12">
                   <n-grid-item span="2">
                     <n-form-item label="Host Server">
-                      <n-input v-model:value="config.host" placeholder="grace.hprc.tamu.edu" :disabled="connected" />
+                      <n-auto-complete
+                        v-model:value="config.host"
+                        :options="hostOptions"
+                        placeholder="grace.hprc.tamu.edu"
+                        :disabled="connected"
+                        :get-show="() => hostOptions.length > 0"
+                        @select="handleHostSelect"
+                        style="width: 100%"
+                      />
                     </n-form-item>
                   </n-grid-item>
                   <n-grid-item>
@@ -194,7 +202,7 @@ import FileBrowser from '../views/FileBrowser.vue'
 import {
   createDiscreteApi,
   NConfigProvider, NGlobalStyle, NLayoutHeader,
-  NCard, NForm, NFormItem, NInput, NButton, NButtonGroup, NTag, NGrid, NGridItem, NSpace, NIcon, NModal, NDivider, NAlert, NInputNumber
+  NCard, NForm, NFormItem, NInput, NButton, NButtonGroup, NTag, NGrid, NGridItem, NSpace, NIcon, NModal, NDivider, NAlert, NInputNumber, NAutoComplete
 } from 'naive-ui'
 import { LogoPython, FolderOpenOutline, SettingsOutline } from '@vicons/ionicons5'
 import axios from 'axios'
@@ -217,6 +225,15 @@ const connected = ref(false)
 const loading = ref(false)
 const config = ref({ host: '', user: '', password: '', auth_code: '1' })
 const globalInitScript = ref('')
+const savedPresets = ref({}) // instance_presets keyed by user@host
+
+const hostOptions = computed(() => {
+  return Object.keys(savedPresets.value).map(key => {
+    const atIdx = key.indexOf('@')
+    const host = atIdx > 0 ? key.substring(atIdx + 1) : key
+    return { label: host, value: host }
+  })
+})
 
 // Terminal 面板拖拽状态
 const terminalHeight = ref(220)
@@ -345,7 +362,22 @@ const loadSavedConfig = async () => {
     if (data.init_script) {
         globalInitScript.value = data.init_script
     }
+    if (data.instance_presets) {
+      savedPresets.value = data.instance_presets
+    }
   } catch (e) { console.log('Config load skipped') }
+}
+
+const handleHostSelect = (hostValue) => {
+  // find matching preset key to extract user
+  const match = Object.keys(savedPresets.value).find(key => {
+    const atIdx = key.indexOf('@')
+    return atIdx > 0 && key.substring(atIdx + 1) === hostValue
+  })
+  if (match) {
+    const atIdx = match.indexOf('@')
+    config.value.user = match.substring(0, atIdx)
+  }
 }
 
 const handleConnectionAction = () => {

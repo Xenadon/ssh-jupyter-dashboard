@@ -406,18 +406,38 @@ class SSHManager:
             logger.info(f"[SFTP INTERNAL] list_dir - listing: '{path}'")
             entries = self.sftp_client.listdir_attr(path)
             for entry in entries:
-                entry_type = 'directory' if stat.S_ISDIR(entry.st_mode) else 'file'
-                items.append({
-                    'name': entry.filename,
-                    'path': f"{path.rstrip('/')}/{entry.filename}",
-                    'type': entry_type,
-                    'size': entry.st_size,
-                    'modified': entry.st_mtime,
-                    'permissions': stat.filemode(entry.st_mode) if hasattr(stat, 'filemode') else oct(entry.st_mode)[-3:]
-                })
+                entry_path = f"{path.rstrip('/')}/{entry.filename}"
+                if stat.S_ISLNK(entry.st_mode):
+                    try:
+                        real = self.sftp_client.stat(entry_path)
+                        target_type = 'directory' if stat.S_ISDIR(real.st_mode) else 'file'
+                    except Exception:
+                        target_type = 'broken'
+                    items.append({
+                        'name': entry.filename,
+                        'path': entry_path,
+                        'type': 'symlink',
+                        'target_type': target_type,
+                        'size': entry.st_size,
+                        'modified': entry.st_mtime,
+                        'permissions': stat.filemode(entry.st_mode) if hasattr(stat, 'filemode') else oct(entry.st_mode)[-3:]
+                    })
+                else:
+                    entry_type = 'directory' if stat.S_ISDIR(entry.st_mode) else 'file'
+                    items.append({
+                        'name': entry.filename,
+                        'path': entry_path,
+                        'type': entry_type,
+                        'size': entry.st_size,
+                        'modified': entry.st_mtime,
+                        'permissions': stat.filemode(entry.st_mode) if hasattr(stat, 'filemode') else oct(entry.st_mode)[-3:]
+                    })
 
-            # Sort: directories first, then by name
-            items.sort(key=lambda x: (0 if x['type'] == 'directory' else 1, x['name'].lower()))
+            # Sort: directories and dir-symlinks first, then by name
+            def sort_key(x):
+                is_dir = x['type'] == 'directory' or (x['type'] == 'symlink' and x.get('target_type') == 'directory')
+                return (0 if is_dir else 1, x['name'].lower())
+            items.sort(key=sort_key)
             elapsed = time.time() - start_time
             logger.info(f"[SFTP OPERATION COMPLETE] list_dir - {elapsed:.3f}s, {len(items)} items, path: '{path}'")
             return items, path

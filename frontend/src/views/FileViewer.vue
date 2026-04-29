@@ -10,7 +10,7 @@
     <div v-else-if="error" class="error-state">
       <n-result status="error" :title="errorTitle" :description="errorMessage">
         <template #footer>
-          <n-button @click="closeTab">Close</n-button>
+          <n-button @click="closeTab">Back</n-button>
         </template>
       </n-result>
     </div>
@@ -24,7 +24,7 @@
         <template #footer>
           <n-space>
             <n-button type="primary" @click="downloadFile">Download File</n-button>
-            <n-button @click="closeTab">Close</n-button>
+            <n-button @click="closeTab">Back</n-button>
           </n-space>
         </template>
       </n-result>
@@ -39,7 +39,7 @@
         <template #footer>
           <n-space>
             <n-button type="primary" @click="downloadFile">Download File</n-button>
-            <n-button @click="closeTab">Close</n-button>
+            <n-button @click="closeTab">Back</n-button>
           </n-space>
         </template>
       </n-result>
@@ -201,7 +201,7 @@
               <template #icon>
                 <n-icon :component="CloseOutline" />
               </template>
-              Close
+              Back
             </n-button>
           </div>
         </div>
@@ -247,7 +247,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NSpin, NResult, NButton, NSpace, NIcon, NTag, NSelect, NSwitch, NInput,
   createDiscreteApi
@@ -260,6 +260,8 @@ import {
 import axios from 'axios'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import MonacoEditor from '../components/MonacoEditor.vue'
 import SvTablePreview from '../components/SvTablePreview.vue'
 import configStore from '../stores/config.js'
@@ -340,6 +342,7 @@ const languageOptions = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const getBaseUrl = () => configStore.baseUrl.value
 
 // Props from route
@@ -494,11 +497,70 @@ const isTableFile = computed(() => {
   return tableExts.includes(ext)
 })
 
+// KaTeX marked extension
+const katexExtension = {
+  extensions: [
+    {
+      name: 'blockMath',
+      level: 'block',
+      start(src) { return src.indexOf('$$') },
+      tokenizer(src) {
+        const match = src.match(/^\$\$([\s\S]+?)\$\$/)
+        if (match) return { type: 'blockMath', raw: match[0], math: match[1].trim() }
+      },
+      renderer(token) {
+        return `<div class="katex-block">${katex.renderToString(token.math, { displayMode: true, throwOnError: false })}</div>\n`
+      }
+    },
+    {
+      name: 'inlineMath',
+      level: 'inline',
+      start(src) { return src.indexOf('$') },
+      tokenizer(src) {
+        const match = src.match(/^\$([^\$\n]+?)\$/)
+        if (match) return { type: 'inlineMath', raw: match[0], math: match[1].trim() }
+      },
+      renderer(token) {
+        return katex.renderToString(token.math, { displayMode: false, throwOnError: false })
+      }
+    }
+  ]
+}
+marked.use(katexExtension)
+
+// KaTeX allowed tags/attributes for DOMPurify
+const KATEX_ALLOWED_TAGS = [
+  'math', 'annotation', 'semantics', 'mtext', 'mn', 'mo', 'mi', 'mspace',
+  'mover', 'munder', 'munderover', 'msup', 'msub', 'msubsup', 'mfrac',
+  'mroot', 'msqrt', 'mtable', 'mtr', 'mtd', 'mlabeledtr', 'mrow', 'menclose',
+  'mstyle', 'mpadded', 'mphantom', 'mglyph', 'svg', 'path', 'line', 'circle',
+  'g', 'rect', 'use', 'defs', 'symbol', 'marker', 'clippath', 'stop',
+  'lineargradient', 'radialgradient', 'mask', 'text', 'tspan', 'span', 'div'
+]
+
 // Rendered markdown HTML
 const renderedMarkdown = computed(() => {
   if (!isMarkdown.value) return ''
   const html = marked.parse(fileContent.value || '')
-  return DOMPurify.sanitize(html)
+  return DOMPurify.sanitize(html, {
+    ADD_TAGS: KATEX_ALLOWED_TAGS,
+    ADD_ATTR: [
+      'xmlns', 'viewBox', 'width', 'height', 'preserveAspectRatio', 'x', 'y',
+      'cx', 'cy', 'r', 'd', 'fill', 'stroke', 'stroke-width', 'transform',
+      'clip-path', 'clip-rule', 'fill-rule', 'marker-end', 'marker-start',
+      'marker-mid', 'xlink:href', 'href', 'aria-hidden', 'focusable',
+      'role', 'style', 'class', 'x1', 'y1', 'x2', 'y2', 'offset',
+      'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform',
+      'patternUnits', 'id', 'refx', 'refy', 'markerwidth', 'markerheight',
+      'orient', 'maskcontentunits', 'maskunits', 'color', 'display',
+      'dominant-baseline', 'text-anchor', 'overflow', 'font-family',
+      'font-size', 'font-style', 'font-weight', 'letter-spacing',
+      'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap',
+      'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'fill-opacity',
+      'visibility', 'pointer-events', 'shape-rendering', 'rx', 'ry'
+    ],
+    FORCE_BODY: true
+  })
 })
 
 // Editor options computed property
@@ -732,13 +794,12 @@ const downloadFile = () => {
   window.location.href = url
 }
 
-// Close tab
+// Back to file browser
 const closeTab = () => {
-  window.close()
-  // If window.close() doesn't work (not opened by script), go back
-  if (!window.closed) {
-    window.history.back()
-  }
+  const currentPath = filePath.value || ''
+  const lastSlash = currentPath.lastIndexOf('/')
+  const parentPath = lastSlash > 0 ? currentPath.substring(0, lastSlash) : '~'
+  router.push(`/files/${encodeURIComponent(parentPath)}`)
 }
 
 // Handle beforeunload - warn about unsaved changes

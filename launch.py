@@ -10,6 +10,7 @@ Usage:
 import os
 import sys
 import json
+import socket
 import uvicorn
 
 
@@ -29,7 +30,18 @@ def main():
     # Priority: command line > config file > default 8000
     port = int(sys.argv[1]) if len(sys.argv) > 1 else config_port
 
-    print(f"Starting SSH Jupyter Console on http://{host}:{port}")
+    if host == "0.0.0.0":
+        try:
+            lan_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            lan_ip = None
+        print(f"Starting SSH Jupyter Console")
+        print(f"  Local:    http://localhost:{port}")
+        print(f"  Local:    http://127.0.0.1:{port}")
+        if lan_ip and lan_ip != "127.0.0.1":
+            print(f"  Network:  http://{lan_ip}:{port}")
+    else:
+        print(f"Starting SSH Jupyter Console on http://{host}:{port}")
     print(f"Press Ctrl+C to stop\n")
 
     uvicorn.run("backend.main:app", host=host, port=port)

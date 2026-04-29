@@ -4,7 +4,12 @@
     <div class="breadcrumb-bar" @dblclick="startPathEdit">
       <!-- Breadcrumb Display -->
       <n-breadcrumb v-if="!isEditingPath">
-        <n-breadcrumb-item v-for="(crumb, index) in breadcrumbs" :key="index" @click="navigateTo(crumb.path)">
+        <n-breadcrumb-item
+          v-for="(crumb, index) in displayBreadcrumbs"
+          :key="index"
+          :style="crumb.collapsed ? { cursor: 'default', pointerEvents: 'none' } : {}"
+          @click="!crumb.collapsed && navigateTo(crumb.path)"
+        >
           {{ crumb.name }}
         </n-breadcrumb-item>
       </n-breadcrumb>
@@ -108,9 +113,11 @@
             <div class="col-name">
               <n-icon size="20" :class="item.type">
                 <folder-outline v-if="item.type === 'directory'" />
-                <document-outline v-else />
+                <document-outline v-else-if="item.type === 'file'" />
+                <return-down-back-outline v-else-if="item.type === 'symlink'" />
               </n-icon>
               <span class="item-name">{{ item.name }}</span>
+              <span v-if="item.type === 'symlink' && item.target_type === 'broken'" class="symlink-broken" title="Broken symlink">!</span>
             </div>
             <div class="col-size">{{ formatSize(item.size) }}</div>
             <div class="col-date">{{ formatDate(item.modified) }}</div>
@@ -136,7 +143,8 @@
           >
             <n-icon size="48" :class="item.type">
               <folder-outline v-if="item.type === 'directory'" />
-              <document-outline v-else />
+              <document-outline v-else-if="item.type === 'file'" />
+              <return-down-back-outline v-else-if="item.type === 'symlink'" />
             </n-icon>
             <span class="item-name" :title="item.name">{{ item.name }}</span>
             <span class="item-size">{{ formatSize(item.size) }}</span>
@@ -230,7 +238,7 @@ import {
 } from 'naive-ui'
 import {
   FolderOutline, DocumentOutline, ListOutline, GridOutline,
-  RefreshOutline, CaretUpOutline, CaretDownOutline
+  RefreshOutline, CaretUpOutline, CaretDownOutline, ReturnDownBackOutline
 } from '@vicons/ionicons5'
 import axios from 'axios'
 import FileEditor from '../components/FileEditor.vue'
@@ -276,9 +284,9 @@ const sortedItems = computed(() => {
   const parentDir = sorted.find(item => item.name === '..')
   const regularItems = sorted.filter(item => item.name !== '..')
 
-  // Separate directories and files
-  const directories = regularItems.filter(item => item.type === 'directory')
-  const files = regularItems.filter(item => item.type !== 'directory')
+  // Separate directories (including dir-symlinks) and files
+  const directories = regularItems.filter(item => item.type === 'directory' || (item.type === 'symlink' && item.target_type === 'directory'))
+  const files = regularItems.filter(item => item.type !== 'directory' && !(item.type === 'symlink' && item.target_type === 'directory'))
 
   // Sort function for items
   const sortItems = (a, b) => {
@@ -438,6 +446,17 @@ const breadcrumbs = computed(() => {
   }
 
   return crumbs
+})
+
+const displayBreadcrumbs = computed(() => {
+  const crumbs = breadcrumbs.value
+  if (crumbs.length <= 8) return crumbs
+  // 层次 > 8 时，将第2-5级（索引1-4）合并为 "..."
+  return [
+    crumbs[0],
+    { name: '...', path: null, collapsed: true },
+    ...crumbs.slice(5)
+  ]
 })
 
 // Check if any file is selected or targeted
@@ -641,6 +660,14 @@ const clearSelection = () => {
 const handleItemDblClick = (item) => {
   if (item.type === 'directory') {
     navigateTo(item.path)
+  } else if (item.type === 'symlink') {
+    if (item.target_type === 'directory') {
+      navigateTo(item.path)
+    } else if (item.target_type === 'file') {
+      openFile(item)
+    } else {
+      message.error('Broken symlink')
+    }
   } else {
     openFile(item)
   }
@@ -1541,6 +1568,17 @@ watch(() => connected.value, (isConnected) => {
 
 .file-item .file {
   color: #1890ff;
+}
+
+.file-item .symlink {
+  color: #52c41a;
+}
+
+.symlink-broken {
+  margin-left: 4px;
+  color: #ff4d4f;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 .status-bar {

@@ -85,5 +85,17 @@ if __name__ == "__main__":
     server = app_cfg.get("server", {})
     host = server.get("host", "127.0.0.1")
     port = server.get("port", 8000)
-    print(f"Starting server on {host}:{port}")
+    if host == "0.0.0.0":
+        import socket
+        try:
+            lan_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            lan_ip = None
+        print(f"Starting SSH Jupyter Console")
+        print(f"  Local:    http://localhost:{port}")
+        print(f"  Local:    http://127.0.0.1:{port}")
+        if lan_ip and lan_ip != "127.0.0.1":
+            print(f"  Network:  http://{lan_ip}:{port}")
+    else:
+        print(f"Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
